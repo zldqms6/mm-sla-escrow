@@ -102,7 +102,6 @@ for (let slot = 0; slot < N_SLOTS; slot++) {
   if (now() < at) await sleep((at - now()) * 1000);
   for (const ag of out.agreements) {
     if (ag.label === "nope-bithumb" && slot > 0) continue;   // once is enough to show the error path
-    if (ag.checks.some((c) => c.slot === slot)) continue;    // --resume: already recorded
     if (ag.checks.some((c) => c.slot === slot)) continue;    // done before a resume
     const who = ag.checker === "mm" ? mm : project;
     const tx = await write(who, "check", [ag.id]);
