@@ -77,26 +77,26 @@ The portal review pointed out what that allows: around the threshold a validator
 - `test_leader_cannot_pick_the_verdict_near_the_threshold`: the depth floor is set 1,000 won above the thinnest side of a real book, and a leader that nudges its numbers to claim a pass is rejected.
 - `test_book_moves_between_fetches_a_split_records_nothing`: the two real snapshots above, 20 seconds apart, give different verdicts, so the validator votes against.
 
-## Live run on Studionet, current contract (2026-11-11)
+## Live run on Studionet, current contract (2026-11-12)
 
-Contract [`0x34D32F1F3b1181bCEb99F1A7C13F585F6841Fda9`](https://explorer-studio.genlayer.com/address/0x34D32F1F3b1181bCEb99F1A7C13F585F6841Fda9). `deployments.json` lists it, and the `glcheck` workflow fails if the deployed source stops matching `contracts/mm_sla_escrow.py`. `scripts/live_demo.mjs` funded four agreements of 30 GEN each, three 10-minute slots each (from 03:51 UTC), and checked every slot once against the live books. Full output is in `demo_result.json`. Every transaction was `ACCEPTED`, leader `SUCCESS` unless noted. Depths are bid / ask in won.
+Contract [`0xa129B0e59ef2183F6857252b195b78896478128f`](https://explorer-studio.genlayer.com/address/0xa129B0e59ef2183F6857252b195b78896478128f). `deployments.json` lists it, and the `glcheck` workflow fails if the deployed source stops matching `contracts/mm_sla_escrow.py`. `scripts/live_demo.mjs` funded four agreements of 30 GEN each, three 10-minute slots each (from 02:00 UTC), and checked every slot once against the live books. Full output is in `demo_result.json`. Every transaction was `ACCEPTED`, leader `SUCCESS` unless noted. Depths are bid / ask in won.
 
 | Agreement | Terms | Slot 0 | Slot 1 | Slot 2 | `settle()` |
 |---|---|---|---|---|---|
-| #0 Upbit KRW-XRP | ≤ 20 bps, ≥ 300M won each side within 1% | pass: 7 bps, 1.87B / 1.69B | pass: 7 bps, 1.85B / 1.15B | pass: 7 bps, 1.71B / 1.21B | 3/3 → **30 GEN to the MM** ([`0x4cb1…4931`](https://explorer-studio.genlayer.com/tx/0x4cb1e863694cab829ac30851d1f709e54da558c24b0aea4d08e4eb5696ba4931)) |
-| #2 Upbit KRW-SOPH | ≤ 50 bps, ≥ 3M won each side within 1% | pass: 34 bps, 3.08M / 7.36M ([`0x8502…db90`](https://explorer-studio.genlayer.com/tx/0x850280d1c8881f94ef0e9726abf88dc31937e5b5554546f2fb50f6c6247adb90)) | fail: 34 bps, 2.69M / 8.27M ([`0x2377…5d9f`](https://explorer-studio.genlayer.com/tx/0x237772c02bb367c3f30cf677d48b18549b8b7463ccc3fddead2ff2ddfab05d9f)) | pass: 34 bps, 4.28M / 7.08M | 2/3 = 67%, under the 75% minimum → **0 to the MM**, 30 back ([`0x2e08…2e0e`](https://explorer-studio.genlayer.com/tx/0x2e084ae9e15f44b108bc8706d72b89daa29a028a8808b863ee78823981cb2e0e)) |
-| #3 Bithumb KRW-SOPH | same | fail: 118 bps, 3.77M / 0.99M | fail: 123 bps, 3.76M / 2.10M | fail: 113 bps, 2.67M / 1.06M | 0/3 → 0 to the MM, 30 back ([`0xc5f1…6550`](https://explorer-studio.genlayer.com/tx/0xc5f18fc83f777992e24c37cfa9f2080c56e2005364b33444a3d3240e72e06550)) |
-| #4 Bithumb KRW-NOPE (no such market) | same | leader `ERROR` `[EXTERNAL] bithumb has no market KRW-NOPE` ([`0x282a…24c9`](https://explorer-studio.genlayer.com/tx/0x282a757b34f740ac61fb5df1a99443639bc4e17d3aa107415042cd62bb2d24c9)); validators agreed on the error, nothing recorded | - | - | 0/3 → 30 back |
+| #0 Upbit KRW-XRP | ≤ 20 bps, ≥ 300M won each side within 1% | pass: 8 bps, 3.61B / 941.56M | pass: 8 bps, 2.89B / 1.28B | pass: 8 bps, 1.55B / 1.49B | 3/3 → **30 GEN to the MM** ([`0x7ba9…0d24`](https://explorer-studio.genlayer.com/tx/0x7ba9608c3174dae4313c077d9b1035b4400896ff03fa66c7dd053e532b970d24)) |
+| #1 Upbit KRW-SOPH | ≤ 50 bps, ≥ 3M won each side within 1% | fail: 33 bps, 7.01M / 0.86M | fail: 65 bps, 3.40M / 3.16M ([`0x6e49…6d36`](https://explorer-studio.genlayer.com/tx/0x6e4993b1a4f4723bdd7f860d841f0d6b9fe70dc76de8a3e82feb9d8e3fdb6d36)) | fail: 33 bps, 1.75M / 1.71M | 0/3 → **0 to the MM**, 30 back ([`0x9a99…8dfe`](https://explorer-studio.genlayer.com/tx/0x9a992e09dbfa68f72c6cb660e928b6f82fb68c1c723f20f00c8d29586c658dfe)) |
+| #2 Bithumb KRW-SOPH | same | fail: 111 bps, 1.63M / 1.64M | fail: 111 bps, 1.08M / 1.64M | fail: 5 bps, 1.19M / 1.64M | 0/3 → 0 to the MM, 30 back ([`0x4de3…cafd`](https://explorer-studio.genlayer.com/tx/0x4de3466a39e6b9b14309b435ecbfe6aa813b7a4911ceb9b6787e5af8cbc8cafd)) |
+| #3 Bithumb KRW-NOPE (no such market) | same | leader `ERROR` `[EXTERNAL] bithumb has no market KRW-NOPE` ([`0x2ca5…77ae`](https://explorer-studio.genlayer.com/tx/0x2ca500763cf432a386abc5fcc3d839f768dbb1157d7071dde03b80d27f2477ae)); validators agreed on the error, nothing recorded | - | - | 0/3 → 30 back |
 
 Every check had 3 AGREE votes and 2 IDLE validators that didn't vote in the round. There were no DISAGREE votes.
 
-The Upbit SOPH agreement is the case the fix is about. In slot 0 the bid side was 3.08M won against a 3M floor, 2.7% over the line. In slot 1 it was 2.69M, 10% under. Under the old rule a validator would have accepted either verdict from the leader in both slots, because neither book was 2× away from the limit. Now each validator that voted had to get the same pass bit from its own fetch, and they did: pass in slot 0, fail in slot 1.
+Upbit SOPH slot 1 is the kind of book the fix is about: a 65 bps spread against a 50 bps limit, with 3.40M / 3.16M won against a 3M floor. Under the old rule a validator would have gone along with a pass or a fail from the leader there, because the spread was under 2× the limit and both sides were over half the floor and under twice it. Now each validator that voted had to get fail from its own fetch.
 
-A check that ends without consensus did not happen in this run. That path is covered by the tests, not by a live transaction.
+The same source is also deployed at [`0x34D32F1F3b1181bCEb99F1A7C13F585F6841Fda9`](https://explorer-studio.genlayer.com/address/0x34D32F1F3b1181bCEb99F1A7C13F585F6841Fda9), the address the web app ([mm-sla-app](https://github.com/zldqms6/mm-sla-app)) uses; `deployments.json` lists both. A run of this script there on 2026-11-11 is in `demo_result_34d3.json`. In that run Upbit SOPH passed slot 0 with the bid side at 3.08M won, 2.7% over the floor, and failed slot 1 at 2.69M, 10% under, which settled at 2/3 = 67%, under the 75% minimum, so 0 to the MM.
 
-Agreements #1, #5 and #6 on the same contract are not from this script. They were created by the web app built on this contract ([mm-sla-app](https://github.com/zldqms6/mm-sla-app)), whose README lists them.
+A check that ends without consensus did not happen in either run. That path is covered by the tests, not by a live transaction.
 
-Before this address there was one more deployment of the fixed contract (`0x7826B076CC17E33d5a6f3F86Ab7Af0cE9492c327`). Its docstring said a check needs *every* validator to match, which overstates it: the rule is a majority. The docstring is part of the deployed source, so I corrected it and redeployed rather than leave a wrong sentence on chain.
+Before these two addresses there was one more deployment of the fixed contract (`0x7826B076CC17E33d5a6f3F86Ab7Af0cE9492c327`). Its docstring said a check needs *every* validator to match, which overstates it: the rule is a majority. The docstring is part of the deployed source, so I corrected it and redeployed rather than leave a wrong sentence on chain.
 
 ## Live run on the first version (2026-10-26)
 
