@@ -1,0 +1,23 @@
+# Contract tests in gltest direct mode: no node, no network. The order books are real
+# Upbit/Bithumb snapshots saved under tests/fixtures.
+name: contract tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-test.txt
+      # gltest direct mode uses the newest genvm release unless one is cached; pin the one the
+      # tests were written against (the contract's runner hash is in that release)
+      - name: Cache genvm v0.2.16 for gltest
+        run: |
+          mkdir -p ~/.cache/gltest-direct
+          curl -fsSL https://github.com/genlayerlabs/genvm/releases/download/v0.2.16/genvm-universal.tar.xz             -o ~/.cache/gltest-direct/genvm-universal-v0.2.16.tar.xz
+      - run: python -m pytest -q tests

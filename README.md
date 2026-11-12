@@ -65,11 +65,42 @@ A thin book changes by 20x on one side in 20 seconds. Validators never fetch at 
 1. **The leader's numbers must add up.** Mid, spread and the pass flag are recomputed from the leader's own best bid/ask and depths. A leader saying "pass" over numbers that fail is rejected.
 2. **Same moment.** The book timestamp from the exchange must be within 3 minutes of the validator's own. This stops a leader from replaying an old good book.
 3. **Same price level.** The leader's mid must be within 3% of the validator's. This stops a leader from passing off another market's book.
-4. **Only a clear contradiction overturns the verdict.** If the leader says pass and the validator's own book *clearly* fails (spread at least 2× the limit, or one side at most half the minimum depth), it disagrees. If the leader says fail and the validator's book *clearly* passes (spread at most half the limit, both sides at least 2× the minimum), it disagrees. Anywhere in between, the book could plausibly have looked like the leader's a few seconds earlier, so it goes along.
+4. **Same verdict.** The validator computes pass or fail from its own fetch of the book, and votes for the leader only if it got the same answer. The last line of `_leader_ok` is `return leader["pass"] is mine["pass"]`.
 
-The result is that a borderline book gets the leader's verdict, and a book that is far on one side of the line gets the right verdict no matter who leads. The tests show the uncomfortable case too: with the two real snapshots above, a leader who saw the good one and a validator who saw the bad one *should* disagree (0.4M against a 3M minimum is a clear fail), and do.
+So the numbers may differ between validators (they have to, see the table), but the verdict may not. A check is recorded only when a majority of validators reproduced the leader's pass or fail from their own books. If the book sits so close to a limit that too few of them land on the leader's side, the check doesn't reach consensus, nothing is recorded, and the slot can be checked again. With the two real snapshots above, a leader who saw the good book and a validator who saw the bad one disagree.
 
-## Live run on Studionet (2026-10-26)
+### What the first version got wrong (fixed 2026-11-11)
+
+The version I first submitted (`0xC148…F680`) had a softer rule 4: the validator went along with the leader unless its own book *clearly* contradicted it (for a claimed pass: spread at least 2× the limit, or one side at most half the minimum depth; the mirror image for a claimed fail). My reasoning was that a book between those lines could plausibly have looked like the leader's a few seconds earlier.
+
+The portal review pointed out what that allows: around the threshold a validator would approve a pass and would equally approve a fail, so the leader alone picks the verdict, and the verdict changes slot state and the payout. That's right, and the margin is gone. Two tests fail on the old contract and pass on this one:
+- `test_leader_cannot_pick_the_verdict_near_the_threshold`: the depth floor is set 1,000 won above the thinnest side of a real book, and a leader that nudges its numbers to claim a pass is rejected.
+- `test_book_moves_between_fetches_a_split_records_nothing`: the two real snapshots above, 20 seconds apart, give different verdicts, so the validator votes against.
+
+## Live run on Studionet, current contract (2026-11-11)
+
+Contract [`0x34D32F1F3b1181bCEb99F1A7C13F585F6841Fda9`](https://explorer-studio.genlayer.com/address/0x34D32F1F3b1181bCEb99F1A7C13F585F6841Fda9). `deployments.json` lists it, and the `glcheck` workflow fails if the deployed source stops matching `contracts/mm_sla_escrow.py`. `scripts/live_demo.mjs` funded four agreements of 30 GEN each, three 10-minute slots each (from 03:51 UTC), and checked every slot once against the live books. Full output is in `demo_result.json`. Every transaction was `ACCEPTED`, leader `SUCCESS` unless noted. Depths are bid / ask in won.
+
+| Agreement | Terms | Slot 0 | Slot 1 | Slot 2 | `settle()` |
+|---|---|---|---|---|---|
+| #0 Upbit KRW-XRP | ≤ 20 bps, ≥ 300M won each side within 1% | pass: 7 bps, 1.87B / 1.69B | pass: 7 bps, 1.85B / 1.15B | pass: 7 bps, 1.71B / 1.21B | 3/3 → **30 GEN to the MM** ([`0x4cb1…4931`](https://explorer-studio.genlayer.com/tx/0x4cb1e863694cab829ac30851d1f709e54da558c24b0aea4d08e4eb5696ba4931)) |
+| #2 Upbit KRW-SOPH | ≤ 50 bps, ≥ 3M won each side within 1% | pass: 34 bps, 3.08M / 7.36M ([`0x8502…db90`](https://explorer-studio.genlayer.com/tx/0x850280d1c8881f94ef0e9726abf88dc31937e5b5554546f2fb50f6c6247adb90)) | fail: 34 bps, 2.69M / 8.27M ([`0x2377…5d9f`](https://explorer-studio.genlayer.com/tx/0x237772c02bb367c3f30cf677d48b18549b8b7463ccc3fddead2ff2ddfab05d9f)) | pass: 34 bps, 4.28M / 7.08M | 2/3 = 67%, under the 75% minimum → **0 to the MM**, 30 back ([`0x2e08…2e0e`](https://explorer-studio.genlayer.com/tx/0x2e084ae9e15f44b108bc8706d72b89daa29a028a8808b863ee78823981cb2e0e)) |
+| #3 Bithumb KRW-SOPH | same | fail: 118 bps, 3.77M / 0.99M | fail: 123 bps, 3.76M / 2.10M | fail: 113 bps, 2.67M / 1.06M | 0/3 → 0 to the MM, 30 back ([`0xc5f1…6550`](https://explorer-studio.genlayer.com/tx/0xc5f18fc83f777992e24c37cfa9f2080c56e2005364b33444a3d3240e72e06550)) |
+| #4 Bithumb KRW-NOPE (no such market) | same | leader `ERROR` `[EXTERNAL] bithumb has no market KRW-NOPE` ([`0x282a…24c9`](https://explorer-studio.genlayer.com/tx/0x282a757b34f740ac61fb5df1a99443639bc4e17d3aa107415042cd62bb2d24c9)); validators agreed on the error, nothing recorded | - | - | 0/3 → 30 back |
+
+Every check had 3 AGREE votes and 2 IDLE validators that didn't vote in the round. There were no DISAGREE votes.
+
+The Upbit SOPH agreement is the case the fix is about. In slot 0 the bid side was 3.08M won against a 3M floor, 2.7% over the line. In slot 1 it was 2.69M, 10% under. Under the old rule a validator would have accepted either verdict from the leader in both slots, because neither book was 2× away from the limit. Now each validator that voted had to get the same pass bit from its own fetch, and they did: pass in slot 0, fail in slot 1.
+
+A check that ends without consensus did not happen in this run. That path is covered by the tests, not by a live transaction.
+
+Agreements #1, #5 and #6 on the same contract are not from this script. They were created by the web app built on this contract ([mm-sla-app](https://github.com/zldqms6/mm-sla-app)), whose README lists them.
+
+Before this address there was one more deployment of the fixed contract (`0x7826B076CC17E33d5a6f3F86Ab7Af0cE9492c327`). Its docstring said a check needs *every* validator to match, which overstates it: the rule is a majority. The docstring is part of the deployed source, so I corrected it and redeployed rather than leave a wrong sentence on chain.
+
+## Live run on the first version (2026-10-26)
+
+Kept for history. This run was under the old rule 4, so validators were applying the "clear contradiction" margin. Its output is `demo_result_c148.json`.
 
 Contract [`0xC148A44089a37209585e9Ef57c2cf3585133F680`](https://explorer-studio.genlayer.com/address/0xC148A44089a37209585e9Ef57c2cf3585133F680). `scripts/live_demo.mjs` funded four agreements of 30 GEN each, three 10-minute slots each (01:51-02:21 UTC), and checked every slot once against the live books. All numbers below are what the leader recorded; every transaction is `ACCEPTED`, leader `SUCCESS` unless noted. IDLE means that validator didn't vote in that round.
 
@@ -82,10 +113,10 @@ Contract [`0xC148A44089a37209585e9Ef57c2cf3585133F680`](https://explorer-studio.
 
 What I take from it:
 - **The deep book is boring, as it should be.** XRP passed every slot by a wide margin, and validators agreed every time.
-- **The thin book split validators once.** SOPH slot 1 on Upbit passed with 3.52M won on the ask side against a 3M minimum. Two validators fetched a book that was clearly failing and voted DISAGREE; the majority went along. This is the case the "only a clear contradiction" rule is for, and it shows the rule doesn't hide disagreement: when books really differ, validators say so.
+- **The thin book split validators once.** SOPH slot 1 on Upbit passed with 3.52M won on the ask side against a 3M minimum. Two validators fetched a book that was clearly failing and voted DISAGREE; the majority went along.
 - **Bithumb SOPH is not market-made in any useful sense.** Even in slot 2, with a 4 bps spread, there was barely 1.2M won on the ask side within 1%.
 
-**The first deployment had a bug the live run found.** On the first contract (`0xEd6C789B0526dF27Cb68914762701DA770810625`, same demo, `demo_v1_result.json`), Bithumb SOPH slot 0 came back with best bid 2.526 and bid depth 0. Polling Bithumb showed why: it sometimes lists price levels with size 0, including at the top of the book. The contract treated an empty level as the best bid, so the spread looked tighter than it was. The fix skips zero-size levels. `test_zero_size_levels_do_not_set_the_spread` uses a real Bithumb book where the top bid (2.575) has size 0: the old code reads 20 bps, the fixed code 74 bps. The run above is on the redeployed contract. The Studionet RPC also returned an HTML error page during slot 2, which crashed the script once; `live_demo.mjs resume` picked the run up from `demo_result.json`.
+**The first deployment had a bug the live run found.** On the first contract (`0xEd6C789B0526dF27Cb68914762701DA770810625`, same demo, `demo_v1_result.json`), Bithumb SOPH slot 0 came back with best bid 2.526 and bid depth 0. Polling Bithumb showed why: it sometimes lists price levels with size 0, including at the top of the book. The contract treated an empty level as the best bid, so the spread looked tighter than it was. The fix skips zero-size levels. `test_zero_size_levels_do_not_set_the_spread` uses a real Bithumb book where the top bid (2.575) has size 0: the old code reads 20 bps, the fixed code 74 bps. The 2026-10-26 run above is on the redeployed contract (`0xC148…F680`). The Studionet RPC also returned an HTML error page during slot 2, which crashed the script once; `live_demo.mjs resume` picked the run up from `demo_result.json`.
 
 ## API
 
@@ -118,41 +149,43 @@ An observation (`check`'s return value, and `obs` in a slot):
 Deploy:
 
 ```bash
-genlayer network set studionet
-genlayer deploy --contract contracts/mm_sla_escrow.py
+npm install
+node scripts/deploy.mjs contracts/mm_sla_escrow.py     # Studionet, key in .env (created if missing)
 ```
+
+Put the address in `deployments.json`; the `glcheck` workflow then compares the deployed source with the repo on every push and once a day.
 
 Live demo (writes `demo_result.json`):
 
 ```bash
-npm install
 node scripts/live_demo.mjs <contract address>
 ```
 
 ## Tests
 
 ```bash
-py -3.12 -m venv .venv && .venv/Scripts/pip install genlayer-test
+py -3.12 -m venv .venv && .venv/Scripts/pip install -r requirements-test.txt
 .venv/Scripts/python -X utf8 -m pytest tests -q
 ```
 
-14 direct-mode tests run against **real order books** saved in `tests/fixtures/` (Upbit KRW-XRP and KRW-SOPH, Bithumb KRW-SOPH, each fetched twice 20 seconds apart on 2026-10-26, plus one Bithumb book with a zero-size top level). They cover:
+The tests pin genvm v0.2.16; the first run downloads it. The `contract tests` workflow runs them on every push.
+
+16 direct-mode tests run against **real order books** saved in `tests/fixtures/` (Upbit KRW-XRP and KRW-SOPH, Bithumb KRW-SOPH, each fetched twice 20 seconds apart on 2026-10-26, plus one Bithumb book with a zero-size top level). They cover:
 - **Measuring:** deep XRP book passes (6 bps, billions of won each side). Thin SOPH ask side fails. Bithumb's 146 bps spread fails. A zero-size top bid on Bithumb is skipped (74 bps, not 20); this test fails on the first deployed version.
 - **Slots:** a failure can't be undone by a later passing check. A later failing check overturns a pass. 3 checks per slot max. Unchecked slots count as failed at settlement.
-- **Validators:** a validator 20 s later agrees on the deep book. On the thin book, it goes along with a borderline difference and disagrees on a clear one. A leader that claims pass over failing numbers, inflates depth, misstates the spread, sends a 10-minute-old book, or passes off the XRP book as SOPH is rejected.
+- **Validators:** a validator 20 s later agrees on the deep book. A validator whose numbers differ from the leader's but give the same verdict agrees. One whose own book gives the other verdict votes against, including when the book is right at the threshold. A leader that claims pass over failing numbers, inflates depth, misstates the spread, sends a 10-minute-old book, or passes off the XRP book as SOPH is rejected.
 - **Exchange errors:** Bithumb's 200-with-error and Upbit's 404 for an unknown market are `[EXTERNAL]`, a 429 is `[TRANSIENT]`, and none of them record anything.
 - **Edges:** a book with no bids, and a 2% band where all 30 visible levels are inside the band (`*_truncated: true`).
 - **Settlement:** pro rata (3 of 4 → 30 of 40 GEN) and below the minimum uptime (2 of 4 at 75% → 0, all back to the project).
 
-Removing the "clear contradiction" rule or the timestamp check makes the validator tests fail; I checked both.
+The two near-threshold tests fail on the first version's contract; I checked by running them against that source.
 
 On Windows, `tests/conftest.py` patches a temp-file unlink in gltest's loader.
 
 ## Limits
 
 - **Snapshots, not a time average.** Each check is one look at the book. Real MM contracts often measure time-weighted spread and depth. More checks per slot from both sides get closer to that, but this is sampling.
-- **Borderline books follow the leader.** Inside the "not clearly wrong" zone, the leader's own fetch decides. A biased leader can tilt borderline slots, but can't pass a clearly thin book or fail a clearly healthy one.
-- **Thin books can split validators.** When the book swings across both "clear" lines within seconds (the SOPH case above), validators can disagree and the check goes to rotation or ends undetermined. Nothing is recorded then, and the slot can be checked again.
+- **A book at the limit can end with nothing recorded.** When depth or spread sits right at a threshold, validators' own fetches land on both sides and a check may not reach consensus. The slot stays as it was and can be checked again. A slot that never gets a recorded check counts as failed at settlement, so this goes against the MM, not for it.
 - **30 visible levels.** Upbit and Bithumb return 30 levels. If they all sit inside the band, the depth is a lower bound (`*_truncated: true`), which only ever counts against the MM. Pick a band the book covers, or a lower `min_depth_krw`.
 - **The book shows orders, not who placed them.** The contract measures whether the market was liquid, not whether this MM provided it. That's usually what the project is paying for anyway, but an MM can't be blamed or credited for other participants' orders.
 - **Won markets on two exchanges.** Adding a venue with the same response format is one line in `BOOK_URL`; other formats need a parser.

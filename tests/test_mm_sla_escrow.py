@@ -4,6 +4,9 @@ from pathlib import Path
 CONTRACT = "contracts/mm_sla_escrow.py"
 FIX = Path(__file__).parent / "fixtures"
 GEN = 10**18
+# gltest direct mode otherwise takes whatever genvm release is cached or newest; pin the one
+# these tests were written against (downloaded once into ~/.cache/gltest-direct)
+GENVM = "v0.2.16"
 
 # Real order books saved from the public Upbit and Bithumb APIs on 2026-10-26.
 # "_a" was fetched at 00:55:40 UTC and "_b" 20 seconds later.
@@ -36,7 +39,7 @@ def serve(vm, venue, market, snap=None, status=200, body=None):
 def setup(vm, deploy, project, mm, venue="upbit", market="KRW-SOPH", terms=SOPH, n_slots=4, c=None):
     """A new agreement; on contract c if given (a test can only deploy once)."""
     vm.warp("2026-10-25T23:30:00+00:00")
-    c = c or deploy(CONTRACT)
+    c = c or deploy(CONTRACT, sdk_version=GENVM)
     vm.sender = project
     vm.value = RETAINER
     aid = c.create_agreement(hexaddr(mm), venue, market, json.dumps(terms), START, HOUR, n_slots)
@@ -54,7 +57,7 @@ def check(vm, c, aid, who, venue, market, snap, at=AT_A, **kw):
 
 def test_create_agreement_validation(direct_vm, direct_deploy, direct_alice, direct_bob):
     direct_vm.warp("2026-10-25T23:30:00+00:00")
-    c = direct_deploy(CONTRACT)
+    c = direct_deploy(CONTRACT, sdk_version=GENVM)
     direct_vm.sender = direct_alice
     mm, terms = hexaddr(direct_bob), json.dumps(SOPH)
     with direct_vm.expect_revert("send the retainer"):
@@ -154,21 +157,52 @@ def test_validator_rejects_a_false_leader(direct_vm, direct_deploy, direct_alice
     assert direct_vm.run_validator(leader_result=fake) is False
 
 
-def test_book_moves_between_fetches_only_clear_contradictions_count(direct_vm, direct_deploy, direct_alice, direct_bob):
+def test_book_moves_between_fetches_a_split_records_nothing(direct_vm, direct_deploy, direct_alice, direct_bob):
     c, aid = setup(direct_vm, direct_deploy, direct_alice, direct_bob)
-    # leader fetched _a (fails: thin ask side); a validator 20 s later sees _b, which passes,
-    # but only with 28 bps against a 50 bps limit: not a clear pass, so it goes along
+    # leader fetched _a (fails: thin ask side); a validator 20 s later sees _b, which passes.
+    # v1 went along with the leader here (28 bps against 50 was "not a clear pass").
+    # Now the validator's own verdict differs, so it votes against the leader.
     check(direct_vm, c, aid, direct_alice, "upbit", "KRW-SOPH", "a")
     direct_vm.clear_mocks()
     serve(direct_vm, "upbit", "KRW-SOPH", "b")
-    assert direct_vm.run_validator() is True
-    # the other way round: leader saw _b (pass), the validator's _a has 0.4M against 3M,
-    # a clear fail, so it disagrees. Real books 20 s apart can split validators.
+    assert direct_vm.run_validator() is False
+    # the other way round too: leader saw _b (pass), the validator's _a fails
     c2, aid2 = setup(direct_vm, direct_deploy, direct_alice, direct_bob, c=c)
     check(direct_vm, c2, aid2, direct_bob, "upbit", "KRW-SOPH", "b")
     direct_vm.clear_mocks()
     serve(direct_vm, "upbit", "KRW-SOPH", "a")
     assert direct_vm.run_validator() is False
+
+
+def test_leader_cannot_pick_the_verdict_near_the_threshold(direct_vm, direct_deploy, direct_alice, direct_bob):
+    """The steward's v1 finding: around the threshold a leader could submit either verdict."""
+    c, aid = setup(direct_vm, direct_deploy, direct_alice, direct_bob)
+    probe = check(direct_vm, c, aid, direct_bob, "upbit", "KRW-SOPH", "b")
+    thinnest = min(probe["bid_depth"], probe["ask_depth"])
+    # a second agreement whose depth floor sits just above what _b shows: _b narrowly fails
+    tight = dict(SOPH, min_depth_krw=thinnest + 1_000)
+    c, aid2 = setup(direct_vm, direct_deploy, direct_alice, direct_bob, terms=tight, c=c)
+    honest = check(direct_vm, c, aid2, direct_alice, "upbit", "KRW-SOPH", "b")
+    assert honest["pass"] is False and honest["slot_status"] == "fail"
+    honest = {k: honest[k] for k in honest if k not in ("slot", "slot_status", "checks")}
+    serve(direct_vm, "upbit", "KRW-SOPH", "b")
+    assert direct_vm.run_validator(leader_result=honest) is True
+    # a leader that nudges both depths 1,000 won over the floor and says pass. Its numbers
+    # are internally consistent, same timestamp, same mid. v1 accepted this (the validator's
+    # book failed, but not by 2x); v2 rejects it because the validator's own verdict is fail.
+    nudged = dict(honest, bid_depth=max(honest["bid_depth"], tight["min_depth_krw"]),
+                  ask_depth=max(honest["ask_depth"], tight["min_depth_krw"]), **{"pass": True})
+    assert direct_vm.run_validator(leader_result=nudged) is False
+
+
+def test_same_verdict_from_different_numbers_still_agrees(direct_vm, direct_deploy, direct_alice, direct_bob):
+    # XRP 20 s apart: depths differ by hundreds of millions of won, both pass
+    c, aid = setup(direct_vm, direct_deploy, direct_alice, direct_bob, market="KRW-XRP", terms=XRP)
+    a = check(direct_vm, c, aid, direct_bob, "upbit", "KRW-XRP", "a")
+    direct_vm.clear_mocks()
+    serve(direct_vm, "upbit", "KRW-XRP", "b")
+    assert direct_vm.run_validator() is True
+    assert a["pass"] is True
 
 
 def test_bithumb_wide_spread_fails(direct_vm, direct_deploy, direct_alice, direct_bob):

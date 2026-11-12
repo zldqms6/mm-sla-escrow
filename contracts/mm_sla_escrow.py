@@ -26,12 +26,17 @@ Here the terms are fixed when the project funds the retainer:
                     to the project.
 
 No LLM is involved: everything in the agreement is a number the order book shows.
-What GenLayer adds is that each validator fetches the book itself. Validators fetch
-seconds apart and a thin book can change a lot in that time (a 20 s gap moved
-one-side depth on KRW-SOPH from 0.4M to 9.8M won in the fixtures), so a validator
-does not demand the leader's exact numbers. It rejects the leader only when its own
-book clearly contradicts the leader's verdict, or when the leader's numbers do not
-add up, are stale, or are for a different price level.
+What GenLayer adds is that each validator fetches the book itself and computes its
+own verdict. Validators fetch seconds apart and a thin book can change a lot in that
+time (a 20 s gap moved one-side depth on KRW-SOPH from 0.4M to 9.8M won in the
+fixtures), so a validator does not demand the leader's exact numbers. It does demand
+the leader's exact verdict: the pass bit it computes from its own book must equal the
+leader's, otherwise it votes against. So slot state and the payout only move on a
+verdict that a majority of validators reproduced from their own fetches. If the book
+sits so close to the threshold that too few of them land on the leader's side, the
+check does not reach consensus and records nothing. (v1 accepted the leader unless
+the validator's book clearly contradicted it, which let a leader choose either
+verdict inside that grey zone. Fixed in milestone 1.)
 """
 from genlayer import *
 from dataclasses import dataclass
@@ -55,7 +60,6 @@ MAX_START_DELAY_S = 30 * 86_400
 # validator tolerances (see README "Why validators don't compare exact numbers")
 MAX_SKEW_MS = 180_000           # leader's book timestamp vs this validator's
 MID_TOL_BPS = 300               # leader's mid vs this validator's mid
-CLEAR_FACTOR = 2                # "clearly" = off by at least 2x from the threshold
 
 ERR_EXPECTED = "[EXPECTED]"
 ERR_EXTERNAL = "[EXTERNAL]"
@@ -181,18 +185,8 @@ def _observe(venue: str, market: str, terms: dict) -> dict:
     return _measure(_fetch_book(venue, market), terms)
 
 
-def _clearly_passes(obs: dict, terms: dict) -> bool:
-    return (obs["spread_bps"] * CLEAR_FACTOR <= terms["max_spread_bps"]
-            and min(obs["bid_depth"], obs["ask_depth"]) >= terms["min_depth_krw"] * CLEAR_FACTOR)
-
-
-def _clearly_fails(obs: dict, terms: dict) -> bool:
-    return (obs["spread_bps"] >= terms["max_spread_bps"] * CLEAR_FACTOR
-            or min(obs["bid_depth"], obs["ask_depth"]) * CLEAR_FACTOR <= terms["min_depth_krw"])
-
-
 def _leader_ok(leader: dict, mine: dict, terms: dict) -> bool:
-    """Does this validator's own snapshot support the leader's verdict?"""
+    """Same verdict as this validator's own snapshot, from numbers that add up?"""
     if not isinstance(leader, dict) or set(leader) != set(OBS_KEYS):
         return False
     try:
@@ -218,12 +212,9 @@ def _leader_ok(leader: dict, mine: dict, terms: dict) -> bool:
         return False
     if (my_mid > 0) != (mid > 0):
         return False
-    # books move between fetches: only a clear contradiction overturns the leader
-    if leader["pass"] and _clearly_fails(mine, terms):
-        return False
-    if not leader["pass"] and _clearly_passes(mine, terms):
-        return False
-    return True
+    # the verdict itself must be reproduced exactly: a validator whose own book gives
+    # the other answer votes against the leader
+    return leader["pass"] is mine["pass"]
 
 
 def _errors_agree(leader_res, leader_fn) -> bool:
