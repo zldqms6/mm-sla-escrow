@@ -20,7 +20,11 @@ Here the terms are fixed when the project funds the retainer:
                     record whether the current slot passes. One failing check
                     fails the slot for good; a slot nobody checked counts as
                     failed. So the MM has to prove every slot, and the project
-                    can check whenever it suspects the book is thin.
+                    can check whenever it suspects the book is thin. Each slot
+                    is split into SUB_WINDOWS equal sub-windows and each one
+                    takes at most one recorded check, so checking early and
+                    often cannot use up the slot: every later sub-window still
+                    accepts a check that can fail it.
   settle            anyone, after the term. passed / total slots of the retainer
                     goes to the MM (zero below the minimum share), the rest back
                     to the project.
@@ -54,7 +58,9 @@ MARKET_RE = re.compile(r"^KRW-[A-Z0-9]{1,15}$")
 MIN_INTERVAL_S = 600
 MAX_INTERVAL_S = 86_400
 MAX_SLOTS = 744                 # 31 days of hourly slots
-MAX_CHECKS_PER_SLOT = 3         # after that a passing slot stays passed
+SUB_WINDOWS = 3                 # each slot is split into this many equal sub-windows;
+                                # at most one recorded check per sub-window, so a caller
+                                # can't use up a slot's checks early and lock in a pass
 MAX_START_DELAY_S = 30 * 86_400
 
 # validator tolerances (see README "Why validators don't compare exact numbers")
@@ -281,12 +287,14 @@ class MarketMakerSLA(gl.Contract):
         if not (start <= now < start + interval * int(a.n_slots)):
             raise gl.vm.UserError(f"{ERR_EXPECTED} outside the agreement term")
         slot = (now - start) // interval
+        window = (now - start - slot * interval) * SUB_WINDOWS // interval
         key = f"{agreement_id}:{slot}"
         state = json.loads(self.slots.get(key, '{"status": "unchecked", "checks": 0}'))
         if state["status"] == "fail":
             raise gl.vm.UserError(f"{ERR_EXPECTED} slot {slot} has already failed")
-        if state["checks"] >= MAX_CHECKS_PER_SLOT:
-            raise gl.vm.UserError(f"{ERR_EXPECTED} slot {slot} already has {MAX_CHECKS_PER_SLOT} checks")
+        used = state.get("windows", [])
+        if window in used:
+            raise gl.vm.UserError(f"{ERR_EXPECTED} slot {slot} sub-window {window} already has a check")
         venue, market, terms = a.venue, a.market, json.loads(a.terms)
 
         def leader_fn() -> dict:
@@ -301,6 +309,7 @@ class MarketMakerSLA(gl.Contract):
 
         prev = state["status"]
         state["checks"] += 1
+        state["windows"] = sorted(used + [window])
         state["obs"] = obs
         state["by"] = gl.message.sender_address.as_hex
         if obs["pass"]:
@@ -313,7 +322,7 @@ class MarketMakerSLA(gl.Contract):
                 a.passed = u256(int(a.passed) - 1)
             a.failed = u256(int(a.failed) + 1)
         self.slots[key] = json.dumps(state, sort_keys=True)
-        return dict(obs, slot=slot, slot_status=state["status"], checks=state["checks"])
+        return dict(obs, slot=slot, window=window, slot_status=state["status"], checks=state["checks"])
 
     @gl.public.write
     def settle(self, agreement_id: int) -> dict:

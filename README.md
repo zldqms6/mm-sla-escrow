@@ -31,7 +31,8 @@ create_agreement(mm, venue, market, terms_json, start, interval_s, n_slots)   pa
 check(agreement)                   anyone, any time inside the term
   ├─ slot = (now - start) // interval_s
   │    slot already failed → revert (one failure fails the slot for good)
-  │    slot already has 3 checks → revert
+  │    sub-window = which third of the slot we are in (3 equal sub-windows per slot)
+  │    that sub-window already has a check → revert (one recorded check per sub-window)
   ├─ fetch https://api.<venue>.com/v1/orderbook?markets=<market>    (public, no key)
   │    404 / Bithumb's 200-with-error → [EXTERNAL] no such market, nothing recorded
   │    other non-200 → [TRANSIENT], nothing recorded, try again
@@ -48,7 +49,7 @@ settle(agreement)                  anyone, after the term
   the rest → project
 ```
 
-**Who checks.** A slot nobody checked counts as failed, so the MM has to prove each slot itself (a keeper bot calling `check` once per slot is enough). The project can call `check` too, whenever it thinks the book is thin. One failing check fails the slot even if it passed earlier. So the MM can't just check at good moments; it has to keep the book good the whole time, which is what the retainer is for.
+**Who checks.** A slot nobody checked counts as failed, so the MM has to prove each slot itself (a keeper bot calling `check` once per slot is enough). The project can call `check` too, whenever it thinks the book is thin. One failing check fails the slot even if it passed earlier. Each slot is split into three equal sub-windows and each sub-window records at most one check, so nobody can use up a slot's checks early: whatever happens in the first minutes, the later sub-windows still accept a check that can fail the slot. So the MM can't just check at good moments; it has to keep the book good the whole time, which is what the retainer is for.
 
 ### Why validators don't compare exact numbers
 
@@ -77,9 +78,47 @@ The portal review pointed out what that allows: around the threshold a validator
 - `test_leader_cannot_pick_the_verdict_near_the_threshold`: the depth floor is set 1,000 won above the thinnest side of a real book, and a leader that nudges its numbers to claim a pass is rejected.
 - `test_book_moves_between_fetches_a_split_records_nothing`: the two real snapshots above, 20 seconds apart, give different verdicts, so the validator votes against.
 
-## Live run on Studionet, current contract (2026-11-12)
+### Checks are spread over the slot (fixed 2026-11-14)
 
-Contract [`0xa129B0e59ef2183F6857252b195b78896478128f`](https://explorer-studio.genlayer.com/address/0xa129B0e59ef2183F6857252b195b78896478128f). `deployments.json` lists it, and the `glcheck` workflow fails if the deployed source stops matching `contracts/mm_sla_escrow.py`. `scripts/live_demo.mjs` funded four agreements of 30 GEN each, three 10-minute slots each (from 02:00 UTC), and checked every slot once against the live books. Full output is in `demo_result.json`. Every transaction was `ACCEPTED`, leader `SUCCESS` unless noted. Depths are bid / ask in won.
+The review of the resubmission found a second hole: a slot accepted at most 3 checks, first come first served. The MM could call `check` three times in the first minute of a slot while its book was good, the slot would pass, and the project's check later in the same slot would revert with "already has 3 checks". The pass stood no matter what the book did for the rest of the slot.
+
+Now each slot is divided into `SUB_WINDOWS = 3` equal sub-windows (20 minutes each for an hourly slot) and each sub-window records at most one check. A second call in a sub-window that already has a check reverts with `[EXPECTED] slot N sub-window K already has a check`. Early calls can only use up their own sub-window, so the later ones stay open for a check that can fail the slot. Checks that end without consensus record nothing and don't use up a sub-window.
+
+- `test_early_repeated_checks_cannot_lock_in_a_pass`: the MM checks at minute 1, then tries again at minutes 2 and 3 (both revert); the project's check in the last sub-window, on the real thin SOPH book, fails the slot. On the previous contract the MM's three early checks were all recorded and the project's check reverted.
+- `test_one_recorded_check_per_sub_window`: checks at 00:19:59, 00:20:00 and 00:59:59 land in sub-windows 0, 1 and 2; a fourth in sub-window 2 reverts; the next slot starts with all sub-windows open.
+
+## Live run on Studionet, current contract (2026-11-14)
+
+Contract [`0x596514175bFef03F932628d758429d2Ba632884B`](https://explorer-studio.genlayer.com/address/0x596514175bFef03F932628d758429d2Ba632884B). `deployments.json` lists it, and the `glcheck` workflow fails if the deployed source stops matching `contracts/mm_sla_escrow.py`. Older addresses run earlier versions and are kept only for the history below.
+
+*Sub-window rule, live* (`scripts/subwindow_demo.mjs`, output in `subwindow_result.json`): agreement #8 on Upbit KRW-XRP, one 10-minute slot, so three sub-windows of 200 seconds, 5 GEN retainer.
+
+| Call | Sent | Result | Slot after |
+|---|---|---|---|
+| MM `check` | +15 s, sub-window 0 | recorded, pass ([`0x146f…1b06`](https://explorer-studio.genlayer.com/tx/0x146f1a63ceddff39b349b0ada176048b860a7aa14df2546b0a81b806dc261b06)) | pass, sub-windows used [0] |
+| MM `check` again | +45 s, sub-window 0 | leader `ERROR` `[EXPECTED] slot 0 sub-window 0 already has a check`, validators agreed, nothing recorded ([`0xeabb…8485`](https://explorer-studio.genlayer.com/tx/0xeabb127751ffdc6eccc6623dc0e67f8f2dd711abc542d42a93f3c4511e8e8485)) | unchanged |
+| project `check` | +215 s, sub-window 1 | recorded, pass ([`0x1843…7ed6`](https://explorer-studio.genlayer.com/tx/0x18431cafc3f5614d77f3799fe96b54f04cbedda6d730c16f3df20a49e57d7ed6)) | pass, [0, 1] |
+| project `check` | +415 s, sub-window 2 | recorded, pass ([`0x694b…6ede`](https://explorer-studio.genlayer.com/tx/0x694b9fed24712145314f862115ad04fb3980a39894f96e21f7e311fc371b6ede)) | pass, [0, 1, 2] |
+| `settle()` | after the slot | 1/1 → 5 GEN to the MM ([`0xeca6…335e`](https://explorer-studio.genlayer.com/tx/0xeca6b3223000aa60ea36c80aa67940828b72657a3186b465124c406b908a335e)) | |
+
+The XRP book was deep the whole time, so the project's checks passed too. What the run shows is that the MM's second early call was refused and both later sub-windows still took a check. The case where a later check fails a slot the MM passed early is covered by `test_early_repeated_checks_cannot_lock_in_a_pass` on a real thin book.
+
+*Contract demo* (`scripts/live_demo.mjs`, output in `demo_result.json`): four agreements of 30 GEN each, three 10-minute slots each (from 13:02 UTC), one check per slot. Depths are bid / ask in won.
+
+| Agreement | Terms | Slot 0 | Slot 1 | Slot 2 | `settle()` |
+|---|---|---|---|---|---|
+| #4 Upbit KRW-XRP | ≤ 20 bps, ≥ 300M won each side within 1% | pass: 8 bps, 3.29B / 967.60M | pass: 8 bps, 2.89B / 1.17B | pass: 8 bps, 3.52B / 990.04M | 3/3 → **30 GEN to the MM** ([`0xb82d…97e7`](https://explorer-studio.genlayer.com/tx/0xb82d7fcbb684e106fb38ec0d7d404b17c6bd345c6a501c3a29a49aa27f5c97e7)) |
+| #5 Upbit KRW-SOPH | ≤ 50 bps, ≥ 3M won each side within 1% | pass: 26 bps, 55.72M / 9.01M (3 AGREE / 2 DISAGREE, [`0xb744…7fc9`](https://explorer-studio.genlayer.com/tx/0xb744dfd6402d311315207bbe76ab0bb8faa8066c10cd1cb05e401fd696137fc9)) | pass: 27 bps, 40.69M / 33.38M | pass: 27 bps, 36.19M / 15.49M (3 AGREE / 2 DISAGREE, [`0xfbca…f70b`](https://explorer-studio.genlayer.com/tx/0xfbca711940312211f227fa8571d693450a92dd2cd139ece96f0d7f865d1af70b)) | 3/3 → **30 GEN to the MM** ([`0x50f5…3259`](https://explorer-studio.genlayer.com/tx/0x50f502da913ba03bffdcd971396dd0da0d3d6f6082fbce660d96c1b085143259)) |
+| #6 Bithumb KRW-SOPH | same | fail: 3 bps, 8.53M / 0.46M | fail: 57 bps, 5.31M / 4.31M | fail: 61 bps, 11.49M / 2.29M | 0/3 → 0 to the MM, 30 back ([`0xb4ad…a85e`](https://explorer-studio.genlayer.com/tx/0xb4ad995e353a6f1b57cc1a55a551ee1eb7b97f11f844c355e433dc51841da85e)) |
+| #7 Bithumb KRW-NOPE (no such market) | same | leader `ERROR` `[EXTERNAL] bithumb has no market KRW-NOPE` ([`0xf8bf…fe67`](https://explorer-studio.genlayer.com/tx/0xf8bf23fad878d1464e8428a110892bf533f88ac6a9794780e7499251e9befe67)); validators agreed on the error, nothing recorded | - | - | 0/3 → 30 back |
+
+Two Upbit SOPH checks had 3 AGREE and 2 DISAGREE votes: two validators did not reproduce the leader's pass from their own fetch, the majority did, and the pass was recorded. The script only saves the leader's numbers, so I can't say what those two saw. Every other check had 3 AGREE votes and 2 IDLE validators that didn't vote in the round.
+
+Agreements #0 to #3 come from a first attempt at this run that stopped after one check because the Studionet RPC answered with an HTML error page (`demo_result_aborted.json`). They were settled afterwards with `scripts/settle_ids.mjs` (`settle_ids_result.json`): #0 had one passing check out of 3 slots, under the 75% minimum, so all four returned their retainer to the project and paid the MM nothing.
+
+## Live run on the previous version (2026-11-12)
+
+Contract [`0xa129B0e59ef2183F6857252b195b78896478128f`](https://explorer-studio.genlayer.com/address/0xa129B0e59ef2183F6857252b195b78896478128f): the verdict fix, but still the 3-checks-per-slot cap. `scripts/live_demo.mjs` funded four agreements of 30 GEN each, three 10-minute slots each (from 02:00 UTC), and checked every slot once against the live books. Full output is in `demo_result_a129.json`. Every transaction was `ACCEPTED`, leader `SUCCESS` unless noted. Depths are bid / ask in won.
 
 | Agreement | Terms | Slot 0 | Slot 1 | Slot 2 | `settle()` |
 |---|---|---|---|---|---|
@@ -92,7 +131,7 @@ Every check had 3 AGREE votes and 2 IDLE validators that didn't vote in the roun
 
 Upbit SOPH slot 1 is the kind of book the fix is about: a 65 bps spread against a 50 bps limit, with 3.40M / 3.16M won against a 3M floor. Under the old rule a validator would have gone along with a pass or a fail from the leader there, because the spread was under 2× the limit and both sides were over half the floor and under twice it. Now each validator that voted had to get fail from its own fetch.
 
-The same source is also deployed at [`0x34D32F1F3b1181bCEb99F1A7C13F585F6841Fda9`](https://explorer-studio.genlayer.com/address/0x34D32F1F3b1181bCEb99F1A7C13F585F6841Fda9), the address the web app ([mm-sla-app](https://github.com/zldqms6/mm-sla-app)) uses; `deployments.json` lists both. A run of this script there on 2026-11-11 is in `demo_result_34d3.json`. In that run Upbit SOPH passed slot 0 with the bid side at 3.08M won, 2.7% over the floor, and failed slot 1 at 2.69M, 10% under, which settled at 2/3 = 67%, under the 75% minimum, so 0 to the MM.
+The same version is also deployed at [`0x34D32F1F3b1181bCEb99F1A7C13F585F6841Fda9`](https://explorer-studio.genlayer.com/address/0x34D32F1F3b1181bCEb99F1A7C13F585F6841Fda9), the address the web app ([mm-sla-app](https://github.com/zldqms6/mm-sla-app)) uses. A run of this script there on 2026-11-11 is in `demo_result_34d3.json`. In that run Upbit SOPH passed slot 0 with the bid side at 3.08M won, 2.7% over the floor, and failed slot 1 at 2.69M, 10% under, which settled at 2/3 = 67%, under the 75% minimum, so 0 to the MM.
 
 A check that ends without consensus did not happen in either run. That path is covered by the tests, not by a live transaction.
 
@@ -123,10 +162,10 @@ What I take from it:
 | Method | Who | What |
 |---|---|---|
 | `create_agreement(mm, venue, market, terms_json, start, interval_s, n_slots)` payable | project | locks the retainer, returns the agreement id |
-| `check(agreement_id)` | anyone | measures the live book, records the current slot, returns the observation |
+| `check(agreement_id)` | anyone | measures the live book, records the current slot (one check per sub-window), returns the observation plus `slot`, `window`, `slot_status`, `checks` |
 | `settle(agreement_id)` | anyone, after the term | pays the MM pro rata, refunds the rest |
 | `get_agreement(agreement_id)` | view | terms, retainer, passed / failed slot counts, settled, paid_mm |
-| `get_slot(agreement_id, slot)` | view | `{status, checks, obs, by}`; `obs` is the last observation |
+| `get_slot(agreement_id, slot)` | view | `{status, checks, windows, obs, by}`; `windows` lists the sub-windows that have a check, `obs` is the last observation |
 | `current_slot(agreement_id)` | view | -1 before the term, `n_slots` after it |
 | `get_count()` | view | number of agreements |
 
@@ -170,15 +209,15 @@ py -3.12 -m venv .venv && .venv/Scripts/pip install -r requirements-test.txt
 
 The tests pin genvm v0.2.16; the first run downloads it. The `contract tests` workflow runs them on every push.
 
-16 direct-mode tests run against **real order books** saved in `tests/fixtures/` (Upbit KRW-XRP and KRW-SOPH, Bithumb KRW-SOPH, each fetched twice 20 seconds apart on 2026-10-26, plus one Bithumb book with a zero-size top level). They cover:
+17 direct-mode tests run against **real order books** saved in `tests/fixtures/` (Upbit KRW-XRP and KRW-SOPH, Bithumb KRW-SOPH, each fetched twice 20 seconds apart on 2026-10-26, plus one Bithumb book with a zero-size top level). They cover:
 - **Measuring:** deep XRP book passes (6 bps, billions of won each side). Thin SOPH ask side fails. Bithumb's 146 bps spread fails. A zero-size top bid on Bithumb is skipped (74 bps, not 20); this test fails on the first deployed version.
-- **Slots:** a failure can't be undone by a later passing check. A later failing check overturns a pass. 3 checks per slot max. Unchecked slots count as failed at settlement.
+- **Slots:** a failure can't be undone by a later passing check. A later failing check overturns a pass. One recorded check per sub-window, so early repeated calls can't use up the slot. Unchecked slots count as failed at settlement.
 - **Validators:** a validator 20 s later agrees on the deep book. A validator whose numbers differ from the leader's but give the same verdict agrees. One whose own book gives the other verdict votes against, including when the book is right at the threshold. A leader that claims pass over failing numbers, inflates depth, misstates the spread, sends a 10-minute-old book, or passes off the XRP book as SOPH is rejected.
 - **Exchange errors:** Bithumb's 200-with-error and Upbit's 404 for an unknown market are `[EXTERNAL]`, a 429 is `[TRANSIENT]`, and none of them record anything.
 - **Edges:** a book with no bids, and a 2% band where all 30 visible levels are inside the band (`*_truncated: true`).
 - **Settlement:** pro rata (3 of 4 → 30 of 40 GEN) and below the minimum uptime (2 of 4 at 75% → 0, all back to the project).
 
-The two near-threshold tests fail on the first version's contract; I checked by running them against that source.
+The two near-threshold tests fail on the first version's contract, and the two sub-window tests fail on the 2026-11-12 version; I checked by running them against those sources.
 
 On Windows, `tests/conftest.py` patches a temp-file unlink in gltest's loader.
 

@@ -1,0 +1,129 @@
+{
+  "contract": "0x596514175bFef03F932628d758429d2Ba632884B",
+  "network": "studionet",
+  "slot_s": 600,
+  "n_slots": 3,
+  "agreements": [
+    {
+      "label": "xrp-upbit",
+      "id": 0,
+      "venue": "upbit",
+      "market": "KRW-XRP",
+      "terms": {
+        "max_spread_bps": 20,
+        "band_bps": 100,
+        "min_depth_krw": 300000000,
+        "min_uptime_pct": 75
+      },
+      "checker": "mm",
+      "create": {
+        "hash": "0x84b2ef0b630f934c73305d9bbc4500f8eb188dfda96d6c4c4376cbe5d1278682",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "SUCCESS",
+        "error": null,
+        "votes": [
+          "AGREE",
+          "AGREE",
+          "IDLE",
+          "AGREE",
+          "IDLE"
+        ],
+        "rotations_left": "3",
+        "message": ""
+      },
+      "checks": []
+    },
+    {
+      "label": "soph-upbit",
+      "id": 1,
+      "venue": "upbit",
+      "market": "KRW-SOPH",
+      "terms": {
+        "max_spread_bps": 50,
+        "band_bps": 100,
+        "min_depth_krw": 3000000,
+        "min_uptime_pct": 75
+      },
+      "checker": "project",
+      "create": {
+        "hash": "0x855a951a974b50881145e4ce8e427cb23be5c41e18e14613d9a165a904b72457",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "SUCCESS",
+        "error": null,
+        "votes": [
+          "AGREE",
+          "AGREE",
+          "IDLE",
+          "IDLE",
+          "AGREE"
+        ],
+        "rotations_left": "3",
+        "message": ""
+      },
+      "checks": []
+    },
+    {
+      "label": "soph-bithumb",
+      "id": 2,
+      "venue": "bithumb",
+      "market": "KRW-SOPH",
+      "terms": {
+        "max_spread_bps": 50,
+        "band_bps": 100,
+        "min_depth_krw": 3000000,
+        "min_uptime_pct": 75
+      },
+      "checker": "mm",
+      "create": {
+        "hash": "0x708b8d9664d54de60bef0781e66898414a74a6925ef59a88e2d2583a2429c13a",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "SUCCESS",
+        "error": null,
+        "votes": [
+          "AGREE",
+          "AGREE",
+          "IDLE",
+          "IDLE",
+          "AGREE"
+        ],
+        "rotations_left": "3",
+        "message": ""
+      },
+      "checks": []
+    },
+    {
+      "label": "nope-bithumb",
+      "id": 3,
+      "venue": "bithumb",
+      "market": "KRW-NOPE",
+      "terms": {
+        "max_spread_bps": 50,
+        "band_bps": 100,
+        "min_depth_krw": 3000000,
+        "min_uptime_pct": 75
+      },
+      "checker": "mm",
+      "create": {
+        "hash": "0xc07bec3c0264b0d84dca44e0a44da8adf83895b0d8cffe513d92b55006d0aec6",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "SUCCESS",
+        "error": null,
+        "votes": [
+          "AGREE",
+          "AGREE",
+          "AGREE",
+          "IDLE",
+          "IDLE"
+        ],
+        "rotations_left": "3",
+        "message": ""
+      },
+      "checks": []
+    }
+  ],
+  "start": 1794660834
+}

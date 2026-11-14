@@ -1,0 +1,241 @@
+{
+  "contract": "0x596514175bFef03F932628d758429d2Ba632884B",
+  "settled": [
+    {
+      "id": 0,
+      "before": {
+        "failed": 0,
+        "interval_s": 600,
+        "market": "KRW-XRP",
+        "mm": "0x84B7484E90FB0A25717c77184Ea224deDE1175F4",
+        "n_slots": 3,
+        "paid_mm": 0,
+        "passed": 1,
+        "project": "0x072164FFaD249050B2E47b809f4e9dfBDFB4C255",
+        "retainer": "30000000000000000000",
+        "settled": false,
+        "start": 1794660834,
+        "terms": {
+          "band_bps": 100,
+          "max_spread_bps": 20,
+          "min_depth_krw": 300000000,
+          "min_uptime_pct": 75
+        },
+        "venue": "upbit"
+      },
+      "tx": {
+        "hash": "0xbd824cd48cc0de141023ae5cc5882bc9cb58b24b1bf820e1d0feba60572d7cb5",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "SUCCESS",
+        "error": null,
+        "votes": [
+          "AGREE",
+          "AGREE",
+          "IDLE",
+          "IDLE",
+          "AGREE"
+        ],
+        "rotations_left": "3",
+        "message": ""
+      },
+      "after": {
+        "failed": 0,
+        "interval_s": 600,
+        "market": "KRW-XRP",
+        "mm": "0x84B7484E90FB0A25717c77184Ea224deDE1175F4",
+        "n_slots": 3,
+        "paid_mm": 0,
+        "passed": 1,
+        "project": "0x072164FFaD249050B2E47b809f4e9dfBDFB4C255",
+        "retainer": "30000000000000000000",
+        "settled": true,
+        "start": 1794660834,
+        "terms": {
+          "band_bps": 100,
+          "max_spread_bps": 20,
+          "min_depth_krw": 300000000,
+          "min_uptime_pct": 75
+        },
+        "venue": "upbit"
+      }
+    },
+    {
+      "id": 1,
+      "before": {
+        "failed": 0,
+        "interval_s": 600,
+        "market": "KRW-SOPH",
+        "mm": "0x84B7484E90FB0A25717c77184Ea224deDE1175F4",
+        "n_slots": 3,
+        "paid_mm": 0,
+        "passed": 0,
+        "project": "0x072164FFaD249050B2E47b809f4e9dfBDFB4C255",
+        "retainer": "30000000000000000000",
+        "settled": false,
+        "start": 1794660834,
+        "terms": {
+          "band_bps": 100,
+          "max_spread_bps": 50,
+          "min_depth_krw": 3000000,
+          "min_uptime_pct": 75
+        },
+        "venue": "upbit"
+      },
+      "tx": {
+        "hash": "0x50d0366432e893a4a17c73a4006e3571a710994f0509784ff5d6377cebd851f0",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "SUCCESS",
+        "error": null,
+        "votes": [
+          "AGREE",
+          "AGREE",
+          "AGREE",
+          "AGREE",
+          "AGREE"
+        ],
+        "rotations_left": "3",
+        "message": ""
+      },
+      "after": {
+        "failed": 0,
+        "interval_s": 600,
+        "market": "KRW-SOPH",
+        "mm": "0x84B7484E90FB0A25717c77184Ea224deDE1175F4",
+        "n_slots": 3,
+        "paid_mm": 0,
+        "passed": 0,
+        "project": "0x072164FFaD249050B2E47b809f4e9dfBDFB4C255",
+        "retainer": "30000000000000000000",
+        "settled": true,
+        "start": 1794660834,
+        "terms": {
+          "band_bps": 100,
+          "max_spread_bps": 50,
+          "min_depth_krw": 3000000,
+          "min_uptime_pct": 75
+        },
+        "venue": "upbit"
+      }
+    },
+    {
+      "id": 2,
+      "before": {
+        "failed": 0,
+        "interval_s": 600,
+        "market": "KRW-SOPH",
+        "mm": "0x84B7484E90FB0A25717c77184Ea224deDE1175F4",
+        "n_slots": 3,
+        "paid_mm": 0,
+        "passed": 0,
+        "project": "0x072164FFaD249050B2E47b809f4e9dfBDFB4C255",
+        "retainer": "30000000000000000000",
+        "settled": false,
+        "start": 1794660834,
+        "terms": {
+          "band_bps": 100,
+          "max_spread_bps": 50,
+          "min_depth_krw": 3000000,
+          "min_uptime_pct": 75
+        },
+        "venue": "bithumb"
+      },
+      "tx": {
+        "hash": "0x30398807c64123f596b6d285a014ffcc3d3974930b3007e15e0df27561795aae",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "SUCCESS",
+        "error": null,
+        "votes": [
+          "AGREE",
+          "AGREE",
+          "IDLE",
+          "AGREE",
+          "IDLE"
+        ],
+        "rotations_left": "3",
+        "message": ""
+      },
+      "after": {
+        "failed": 0,
+        "interval_s": 600,
+        "market": "KRW-SOPH",
+        "mm": "0x84B7484E90FB0A25717c77184Ea224deDE1175F4",
+        "n_slots": 3,
+        "paid_mm": 0,
+        "passed": 0,
+        "project": "0x072164FFaD249050B2E47b809f4e9dfBDFB4C255",
+        "retainer": "30000000000000000000",
+        "settled": true,
+        "start": 1794660834,
+        "terms": {
+          "band_bps": 100,
+          "max_spread_bps": 50,
+          "min_depth_krw": 3000000,
+          "min_uptime_pct": 75
+        },
+        "venue": "bithumb"
+      }
+    },
+    {
+      "id": 3,
+      "before": {
+        "failed": 0,
+        "interval_s": 600,
+        "market": "KRW-NOPE",
+        "mm": "0x84B7484E90FB0A25717c77184Ea224deDE1175F4",
+        "n_slots": 3,
+        "paid_mm": 0,
+        "passed": 0,
+        "project": "0x072164FFaD249050B2E47b809f4e9dfBDFB4C255",
+        "retainer": "30000000000000000000",
+        "settled": false,
+        "start": 1794660834,
+        "terms": {
+          "band_bps": 100,
+          "max_spread_bps": 50,
+          "min_depth_krw": 3000000,
+          "min_uptime_pct": 75
+        },
+        "venue": "bithumb"
+      },
+      "tx": {
+        "hash": "0xcaf6e89b3e28bce57a944f6c83565c620455d73860dd4b1c81b42c5ce45f22a7",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "SUCCESS",
+        "error": null,
+        "votes": [
+          "AGREE",
+          "IDLE",
+          "AGREE",
+          "AGREE",
+          "IDLE"
+        ],
+        "rotations_left": "3",
+        "message": ""
+      },
+      "after": {
+        "failed": 0,
+        "interval_s": 600,
+        "market": "KRW-NOPE",
+        "mm": "0x84B7484E90FB0A25717c77184Ea224deDE1175F4",
+        "n_slots": 3,
+        "paid_mm": 0,
+        "passed": 0,
+        "project": "0x072164FFaD249050B2E47b809f4e9dfBDFB4C255",
+        "retainer": "30000000000000000000",
+        "settled": true,
+        "start": 1794660834,
+        "terms": {
+          "band_bps": 100,
+          "max_spread_bps": 50,
+          "min_depth_krw": 3000000,
+          "min_uptime_pct": 75
+        },
+        "venue": "bithumb"
+      }
+    }
+  ]
+}

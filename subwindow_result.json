@@ -1,0 +1,233 @@
+{
+  "contract": "0x596514175bFef03F932628d758429d2Ba632884B",
+  "network": "studionet",
+  "slot_s": 600,
+  "sub_windows": 3,
+  "venue": "upbit",
+  "market": "KRW-XRP",
+  "terms": {
+    "max_spread_bps": 20,
+    "band_bps": 100,
+    "min_depth_krw": 300000000,
+    "min_uptime_pct": 75
+  },
+  "steps": [
+    {
+      "label": "mm, sub-window 0",
+      "sent_offset_s": 15,
+      "tx": {
+        "hash": "0x146f1a63ceddff39b349b0ada176048b860a7aa14df2546b0a81b806dc261b06",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "SUCCESS",
+        "error": null,
+        "votes": [
+          "AGREE",
+          "AGREE",
+          "IDLE",
+          "AGREE",
+          "IDLE"
+        ],
+        "rotations_left": "3",
+        "message": ""
+      },
+      "slot_state": {
+        "by": "0x84B7484E90FB0A25717c77184Ea224deDE1175F4",
+        "checks": 1,
+        "obs": {
+          "ask_depth": 1341294315,
+          "ask_truncated": false,
+          "best_ask": "1358.0",
+          "best_bid": "1357.0",
+          "bid_depth": 2799989125,
+          "bid_truncated": false,
+          "mid": "1357.5",
+          "pass": true,
+          "spread_bps": 8,
+          "ts": 1794663371392
+        },
+        "status": "pass",
+        "windows": [
+          0
+        ]
+      }
+    },
+    {
+      "label": "mm again, sub-window 0",
+      "sent_offset_s": 45,
+      "tx": {
+        "hash": "0xeabb127751ffdc6eccc6623dc0e67f8f2dd711abc542d42a93f3c4511e8e8485",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "ERROR",
+        "error": null,
+        "votes": [
+          "AGREE",
+          "AGREE",
+          "IDLE",
+          "IDLE",
+          "AGREE"
+        ],
+        "rotations_left": "3",
+        "message": "[EXPECTED] slot 0 sub-window 0 already has a check"
+      },
+      "slot_state": {
+        "by": "0x84B7484E90FB0A25717c77184Ea224deDE1175F4",
+        "checks": 1,
+        "obs": {
+          "ask_depth": 1341294315,
+          "ask_truncated": false,
+          "best_ask": "1358.0",
+          "best_bid": "1357.0",
+          "bid_depth": 2799989125,
+          "bid_truncated": false,
+          "mid": "1357.5",
+          "pass": true,
+          "spread_bps": 8,
+          "ts": 1794663371392
+        },
+        "status": "pass",
+        "windows": [
+          0
+        ]
+      }
+    },
+    {
+      "label": "project, sub-window 1",
+      "sent_offset_s": 215,
+      "tx": {
+        "hash": "0x18431cafc3f5614d77f3799fe96b54f04cbedda6d730c16f3df20a49e57d7ed6",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "SUCCESS",
+        "error": null,
+        "votes": [
+          "AGREE",
+          "IDLE",
+          "AGREE",
+          "IDLE",
+          "AGREE"
+        ],
+        "rotations_left": "3",
+        "message": ""
+      },
+      "slot_state": {
+        "by": "0x072164FFaD249050B2E47b809f4e9dfBDFB4C255",
+        "checks": 2,
+        "obs": {
+          "ask_depth": 1253671228,
+          "ask_truncated": false,
+          "best_ask": "1357.0",
+          "best_bid": "1356.0",
+          "bid_depth": 2797062770,
+          "bid_truncated": false,
+          "mid": "1356.5",
+          "pass": true,
+          "spread_bps": 8,
+          "ts": 1794663570392
+        },
+        "status": "pass",
+        "windows": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "label": "project, sub-window 2",
+      "sent_offset_s": 415,
+      "tx": {
+        "hash": "0x694b9fed24712145314f862115ad04fb3980a39894f96e21f7e311fc371b6ede",
+        "status": "ACCEPTED",
+        "result": "MAJORITY_AGREE",
+        "exec": "SUCCESS",
+        "error": null,
+        "votes": [
+          "IDLE",
+          "AGREE",
+          "AGREE",
+          "AGREE",
+          "IDLE"
+        ],
+        "rotations_left": "3",
+        "message": ""
+      },
+      "slot_state": {
+        "by": "0x072164FFaD249050B2E47b809f4e9dfBDFB4C255",
+        "checks": 3,
+        "obs": {
+          "ask_depth": 1223375255,
+          "ask_truncated": false,
+          "best_ask": "1358.0",
+          "best_bid": "1357.0",
+          "bid_depth": 2543034979,
+          "bid_truncated": false,
+          "mid": "1357.5",
+          "pass": true,
+          "spread_bps": 8,
+          "ts": 1794663771392
+        },
+        "status": "pass",
+        "windows": [
+          0,
+          1,
+          2
+        ]
+      }
+    }
+  ],
+  "start": 1794663351,
+  "id": 8,
+  "create": {
+    "hash": "0x8b97799c9b3dbb192f55d0b813e90bbca3630bdb994d59211aa1663be50a531e",
+    "status": "ACCEPTED",
+    "result": "MAJORITY_AGREE",
+    "exec": "SUCCESS",
+    "error": null,
+    "votes": [
+      "AGREE",
+      "AGREE",
+      "AGREE",
+      "IDLE",
+      "AGREE"
+    ],
+    "rotations_left": "3",
+    "message": ""
+  },
+  "settle": {
+    "hash": "0xeca6b3223000aa60ea36c80aa67940828b72657a3186b465124c406b908a335e",
+    "status": "ACCEPTED",
+    "result": "MAJORITY_AGREE",
+    "exec": "SUCCESS",
+    "error": null,
+    "votes": [
+      "AGREE",
+      "IDLE",
+      "AGREE",
+      "IDLE",
+      "AGREE"
+    ],
+    "rotations_left": "3",
+    "message": ""
+  },
+  "final": {
+    "failed": 0,
+    "interval_s": 600,
+    "market": "KRW-XRP",
+    "mm": "0x84B7484E90FB0A25717c77184Ea224deDE1175F4",
+    "n_slots": 1,
+    "paid_mm": "5000000000000000000",
+    "passed": 1,
+    "project": "0x072164FFaD249050B2E47b809f4e9dfBDFB4C255",
+    "retainer": "5000000000000000000",
+    "settled": true,
+    "start": 1794663351,
+    "terms": {
+      "band_bps": 100,
+      "max_spread_bps": 20,
+      "min_depth_krw": 300000000,
+      "min_uptime_pct": 75
+    },
+    "venue": "upbit"
+  }
+}

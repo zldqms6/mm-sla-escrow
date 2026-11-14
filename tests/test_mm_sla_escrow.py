@@ -16,6 +16,7 @@ START = 1792972800                       # 2026-10-26T00:00:00Z
 HOUR = 3600
 AT_A = "2026-10-26T00:55:41+00:00"       # slot 0, right after snapshot _a
 SLOT1 = "2026-10-26T01:10:00+00:00"
+W0 = "2026-10-26T00:10:00+00:00"         # slot 0, first of its 3 sub-windows
 AFTER_4H = "2026-10-26T04:00:00+00:00"
 
 # a thin altcoin on Upbit: 50 bps spread, 3M won each side within 1% of mid
@@ -111,8 +112,8 @@ def test_thin_book_fails_the_slot_for_good(direct_vm, direct_deploy, direct_alic
 
 def test_a_later_failing_check_overturns_a_passing_slot(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
     c, aid = setup(direct_vm, direct_deploy, direct_alice, direct_bob)
-    out = check(direct_vm, c, aid, direct_bob, "upbit", "KRW-SOPH", "b")
-    assert out["pass"] is True and out["checks"] == 1
+    out = check(direct_vm, c, aid, direct_bob, "upbit", "KRW-SOPH", "b", at=W0)
+    assert out["pass"] is True and out["checks"] == 1 and out["window"] == 0
     assert c.get_agreement(aid)["passed"] == 1
     out = check(direct_vm, c, aid, direct_charlie, "upbit", "KRW-SOPH", "a")   # anyone can check
     assert out["slot_status"] == "fail" and out["checks"] == 2
@@ -120,21 +121,44 @@ def test_a_later_failing_check_overturns_a_passing_slot(direct_vm, direct_deploy
     assert a["passed"] == 0 and a["failed"] == 1
 
 
-def test_checks_per_slot_are_capped(direct_vm, direct_deploy, direct_alice, direct_bob):
+def test_early_repeated_checks_cannot_lock_in_a_pass(direct_vm, direct_deploy, direct_alice, direct_bob):
+    """The review case: the MM checks three times in the first minutes of a slot while the
+    book is good. With a plain 3-per-slot cap that used up the slot and the project's later
+    check reverted, so the pass stood. Now only one check per sub-window is recorded, and
+    the project's check in a later sub-window still fails the slot."""
     c, aid = setup(direct_vm, direct_deploy, direct_alice, direct_bob)
-    for _ in range(3):
-        check(direct_vm, c, aid, direct_bob, "upbit", "KRW-SOPH", "b")
-    with direct_vm.expect_revert("already has 3 checks"):
-        check(direct_vm, c, aid, direct_alice, "upbit", "KRW-SOPH", "a")
-    # the next slot is a fresh one
+    out = check(direct_vm, c, aid, direct_bob, "upbit", "KRW-SOPH", "b", at="2026-10-26T00:01:00+00:00")
+    assert out["slot_status"] == "pass" and out["window"] == 0
+    for at in ("2026-10-26T00:02:00+00:00", "2026-10-26T00:03:00+00:00"):
+        with direct_vm.expect_revert("slot 0 sub-window 0 already has a check"):
+            check(direct_vm, c, aid, direct_bob, "upbit", "KRW-SOPH", "b", at=at)
+    # 00:55:41 is in the last sub-window; the thin book "a" fails the slot
+    out = check(direct_vm, c, aid, direct_alice, "upbit", "KRW-SOPH", "a")
+    assert out["window"] == 2 and out["slot_status"] == "fail" and out["checks"] == 2
+    a = c.get_agreement(aid)
+    assert a["passed"] == 0 and a["failed"] == 1
+
+
+def test_one_recorded_check_per_sub_window(direct_vm, direct_deploy, direct_alice, direct_bob):
+    c, aid = setup(direct_vm, direct_deploy, direct_alice, direct_bob)
+    # hourly slot, 3 sub-windows of 20 minutes: 00:00-00:20, 00:20-00:40, 00:40-01:00
+    for at, w in (("2026-10-26T00:19:59+00:00", 0), ("2026-10-26T00:20:00+00:00", 1),
+                  ("2026-10-26T00:59:59+00:00", 2)):
+        out = check(direct_vm, c, aid, direct_bob, "upbit", "KRW-SOPH", "b", at=at)
+        assert out["window"] == w and out["slot_status"] == "pass"
+    assert c.get_slot(aid, 0)["windows"] == [0, 1, 2] and c.get_slot(aid, 0)["checks"] == 3
+    with direct_vm.expect_revert("slot 0 sub-window 2 already has a check"):
+        check(direct_vm, c, aid, direct_alice, "upbit", "KRW-SOPH", "a", at="2026-10-26T00:59:59+00:00")
+    assert c.get_agreement(aid)["passed"] == 1
+    # the next slot starts with all sub-windows open
     out = check(direct_vm, c, aid, direct_alice, "upbit", "KRW-SOPH", "a", at=SLOT1)
-    assert out["slot"] == 1 and out["slot_status"] == "fail"
+    assert out["slot"] == 1 and out["window"] == 0 and out["slot_status"] == "fail"
 
 
 def test_validator_rejects_a_false_leader(direct_vm, direct_deploy, direct_alice, direct_bob):
     c, aid = setup(direct_vm, direct_deploy, direct_alice, direct_bob)
     honest = check(direct_vm, c, aid, direct_alice, "upbit", "KRW-SOPH", "a")
-    honest = {k: honest[k] for k in honest if k not in ("slot", "slot_status", "checks")}
+    honest = {k: honest[k] for k in honest if k not in ("slot", "window", "slot_status", "checks")}
     serve(direct_vm, "upbit", "KRW-SOPH", "a")
     assert direct_vm.run_validator(leader_result=honest) is True
     # says pass, numbers don't support it
@@ -151,7 +175,7 @@ def test_validator_rejects_a_false_leader(direct_vm, direct_deploy, direct_alice
     direct_vm.clear_mocks()
     serve(direct_vm, "upbit", "KRW-SOPH", body=json.dumps([xrp]))
     fake = check(direct_vm, c, aid, direct_bob, "upbit", "KRW-SOPH", None, at=SLOT1, body=json.dumps([xrp]))
-    fake = {k: fake[k] for k in fake if k not in ("slot", "slot_status", "checks")}
+    fake = {k: fake[k] for k in fake if k not in ("slot", "window", "slot_status", "checks")}
     direct_vm.clear_mocks()
     serve(direct_vm, "upbit", "KRW-SOPH", "b")
     assert direct_vm.run_validator(leader_result=fake) is False
@@ -184,7 +208,7 @@ def test_leader_cannot_pick_the_verdict_near_the_threshold(direct_vm, direct_dep
     c, aid2 = setup(direct_vm, direct_deploy, direct_alice, direct_bob, terms=tight, c=c)
     honest = check(direct_vm, c, aid2, direct_alice, "upbit", "KRW-SOPH", "b")
     assert honest["pass"] is False and honest["slot_status"] == "fail"
-    honest = {k: honest[k] for k in honest if k not in ("slot", "slot_status", "checks")}
+    honest = {k: honest[k] for k in honest if k not in ("slot", "window", "slot_status", "checks")}
     serve(direct_vm, "upbit", "KRW-SOPH", "b")
     assert direct_vm.run_validator(leader_result=honest) is True
     # a leader that nudges both depths 1,000 won over the floor and says pass. Its numbers

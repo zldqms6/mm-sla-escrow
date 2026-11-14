@@ -3,12 +3,7 @@
   "deployments": [
     {
       "name": "MarketMakerSLA",
-      "address": "0xa129B0e59ef2183F6857252b195b78896478128f",
-      "source": "contracts/mm_sla_escrow.py"
-    },
-    {
-      "name": "MarketMakerSLA (used by mm-sla-app)",
-      "address": "0x34D32F1F3b1181bCEb99F1A7C13F585F6841Fda9",
+      "address": "0x596514175bFef03F932628d758429d2Ba632884B",
       "source": "contracts/mm_sla_escrow.py"
     }
   ]
